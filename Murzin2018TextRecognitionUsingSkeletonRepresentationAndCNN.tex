@@ -1,3 +1,4 @@
+
 \documentclass[12pt,twoside]{article}
 \usepackage{jmlda}
 \usepackage{calligra}
@@ -115,7 +116,7 @@
 	
 	В качестве базового алгоритма используется свёрточная нейронная сеть для задачи в дискретной постановке. Предлагается использовать следующую структуру сети:
 	
-	$$INPUT -> [[CONV -> RELU]*2 -> POOL]*3 -> FC$$
+	$$\text{INPUT} \rightarrow [[\text{CONV} \rightarrow \text{RELU}]\times2 \rightarrow \text{POOL}]\times3 \rightarrow \text{FC}$$
 	
 	\begin{itemize}
 		\item INPUT --- входной слой, имеет размеры $28\times28\times1$
@@ -128,7 +129,7 @@
 	Обучение сети будет осуществляться методом обратного распространения ошибки.
 	
 	\nocite{*}
-	\bibliography{Murzin2018TextRecognitionBasedOnSceletalLinesAndCNN}
+	\bibliography{Murzin2018TextRecognitionUsingSkeletonRepresentationAndCNN}
 	\bibliographystyle{unsrt}
 	
 	% Решение Программного Комитета:
