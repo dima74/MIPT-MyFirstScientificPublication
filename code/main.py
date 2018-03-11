@@ -101,6 +101,14 @@ class SoftmaxLayer:
         cache = (inputs, outputs)
         return outputs, cache
 
+    def backward(self, gradients, cache):
+        """
+        :param gradients: (C)
+        :param cache:
+        :return:
+        """
+        pass
+
 
 """
 INPUT -> [[CONV -> RELU]*2 -> POOL]*3 -> FC
@@ -147,31 +155,45 @@ class Model:
         layers.append(SoftmaxLayer)
         self.layers = layers
 
+    def forward_pass(self, x_train):
+        previous_layer_input = x_train
+        caches = []
+        for layer, layout_parameters in self.layers:
+            outputs, cache = layer.forward(previous_layer_input, *layout_parameters)
+            previous_layer_input = outputs
+            caches.append(cache)
+        outputs = previous_layer_input
+        return outputs, caches
+
     def train(self, x_train, y_train):
         NUMBER_GRADIENT_ITERATIONS = 100
+        GRADIENT_STEP = 1e-3
         NUMBER_CLASSES = 10
 
         assert x_train.shape == (28, 28, 1)
         for _ in range(NUMBER_GRADIENT_ITERATIONS):
-
             # forward pass
-            previous_layer_input = x_train
-            caches = []
-            for layer, parameters in self.layers:
-                outputs, cache = layer.forward(previous_layer_input, *parameters)
-                previous_layer_input = outputs
-                caches.append(cache)
+            outputs, caches = self.forward_pass(x_train)
 
-            # gradients for probabilities (output layer)
-            gradients = []
-            for x, y, output in zip(x_train, y_train, output):
-                output_right = np.zeros(NUMBER_CLASSES)
-                output_right[y] = 1
-                gradient = output - output_right
-                gradients.append(gradient)
+            # loss
+            losses = []
+            for output, y in zip(outputs, y_train):
+                # -np.log(output * [0,...,0,1,0,...,0])
+                loss = -np.log(output[y])
+                losses.append(loss)
+            gradient_for_loss = np.mean(losses)
+            gradients_for_softmax_outputs = gradient_for_loss * (-)
 
-    def predict(self):
-        pass
+            # backward pass
+            gradients_for_outputs=gradients_for_softmax_outputs
+            for layer, layout_parameters, cache in reversed(zip(self.layers, caches)):
+                gradients_for_inputs, gradients_for_parameters = layer.backward(gradients_for_outputs, cache)
+                layout_parameters[...] = layout_parameters - GRADIENT_STEP * gradients_for_parameters
+                gradients_for_outputs = gradients_for_inputs
+
+    def predict(self, x):
+        outputs, caches = self.forward_pass(x)
+        return outputs
 
 
 def main():
