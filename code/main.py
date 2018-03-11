@@ -21,18 +21,18 @@ conv_input_size = x.shape[0]
 conv_output_size = conv_input_size + 2 * PADDING_SIZE - (FILTER_SIZE - 1)
 
 conv_input = x
-conv_padded = np.pad(conv_input, PADDING_SIZE, 'constant')
+conv_input_padded = np.pad(conv_input, PADDING_SIZE, 'constant')
 conv_output = np.empty((conv_output_size, conv_output_size))
 for i in range(conv_output_size):
     for j in range(conv_output_size):
         filter_weights = np.zeros((FILTER_SIZE, FILTER_SIZE, conv_input_depth))
         filter_bias = 0
-        filter_input = conv_input[i:i + FILTER_SIZE, j:j + FILTER_SIZE, :]
+        filter_input = conv_input_padded[i:i + FILTER_SIZE, j:j + FILTER_SIZE, :]
         conv_output[i][j] = (filter_weights * filter_input).sum() + filter_bias
 
 # RELU
 relu_input = conv_output
-relu_output = np.max(relu_input, 0)
+relu_output = np.maximum(relu_input, 0)
 
 # POOL
 pool_input = relu_output
@@ -50,3 +50,4 @@ fc_output = fc_output_flatted.reshape(fc_input.shape)
 
 # OUPUT
 output = fc_output
+print(output)
