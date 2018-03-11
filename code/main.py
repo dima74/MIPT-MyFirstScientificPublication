@@ -175,17 +175,21 @@ class Model:
             # forward pass
             outputs, caches = self.forward_pass(x_train)
 
-            # loss
-            losses = []
+            # derivative of loss of softmax outputs
+            gradients_for_softmax_outputs = []
             for output, y in zip(outputs, y_train):
-                # -np.log(output * [0,...,0,1,0,...,0])
-                loss = -np.log(output[y])
-                losses.append(loss)
-            gradient_for_loss = np.mean(losses)
-            gradients_for_softmax_outputs = gradient_for_loss * (-)
+                output_right = np.zeros(NUMBER_CLASSES)
+                output_right[y] = 1
+
+                # loss = -np.log(output * output_right)
+                # производная ошибки по вероятностям классов
+                gradient_for_softmax_outputs = -(output_right / output)
+                gradients_for_softmax_outputs.append(gradient_for_softmax_outputs)
+            gradients_for_softmax_outputs = np.mean(gradients_for_softmax_outputs, axis=0)
+            assert gradients_for_softmax_outputs.shape == (NUMBER_CLASSES,)
 
             # backward pass
-            gradients_for_outputs=gradients_for_softmax_outputs
+            gradients_for_outputs = gradients_for_softmax_outputs
             for layer, layout_parameters, cache in reversed(zip(self.layers, caches)):
                 gradients_for_inputs, gradients_for_parameters = layer.backward(gradients_for_outputs, cache)
                 layout_parameters[...] = layout_parameters - GRADIENT_STEP * gradients_for_parameters
