@@ -6,8 +6,10 @@ import mnist
 
 NUMBER_CLASSES = 10
 
+
 class ConvolutionLayer:
     FILTER_SIZE = 3
+    PADDING_SIZE = 1
 
     def forward(self, inputs, weights, biases):
         """
@@ -18,18 +20,19 @@ class ConvolutionLayer:
             outputs: (N, height, width, NUMBER_FILTERS)
             cache: (inputs, weights, biases, outputs)
         """
-        PADDING_SIZE = 1
-        NUMBER_FILTERS = 7
-
         N, input_height, input_width, input_depth = inputs.shape
         assert input_height == input_width
         input_size = input_height
-        output_size = input_size + 2 * PADDING_SIZE - (self.FILTER_SIZE - 1)
+        output_size = input_size + 2 * self.PADDING_SIZE - (self.FILTER_SIZE - 1)
+
+        number_filters = weights.shape[0]
+        assert weights.shape == (number_filters, self.FILTER_SIZE, self.FILTER_SIZE, input_depth)
+        assert biases.shape == (number_filters,)
 
         outputs = []
         for input in inputs:
-            input_padded = np.pad(input, PADDING_SIZE, 'constant')
-            output = np.empty((NUMBER_FILTERS, output_size, output_size))
+            input_padded = np.pad(input, self.PADDING_SIZE, 'constant')
+            output = np.empty((number_filters, output_size, output_size))
             for filter_index, filter_weight, filter_bias in enumerate(zip(weights, biases)):
                 for i in range(output_size):
                     for j in range(output_size):
@@ -42,8 +45,16 @@ class ConvolutionLayer:
         cache = (inputs, weights, biases, outputs)
         return outputs, cache
 
-    def backward(self, gradients, cache):
+    def backward(self, gradients_for_outputs, cache):
+        """
+        :param gradients_for_outputs: (N, depth, height, width)
+        :param cache: (inputs, weights, biases, outputs)
+        :return: (gradients_for_inputs, gradients_for_parameters)
+            gradients_for_inputs:
+            gradients_for_parameters:
+        """
         pass
+
 
 class ReluLayer:
     def forward(self, inputs):
@@ -57,8 +68,19 @@ class ReluLayer:
         cache = (inputs, outputs)
         return outputs, cache
 
-    def backward(self, gradients, cache):
-        pass
+    def backward(self, gradients_for_outputs, cache):
+        """
+        :param gradients_for_outputs: (N, depth, height, width)
+        :param cache: (inputs, outputs)
+        :return: (gradients_for_inputs, gradients_for_parameters)
+            gradients_for_inputs: (N, depth, height, width)
+            gradients_for_parameters: []
+        """
+        inputs, outputs = cache
+        mask = inputs == outputs  # == (inputs >= 0)
+        gradients_for_inputs = gradients_for_outputs * mask
+        return gradients_for_inputs, []
+
 
 class PoolingLayer:
     def forward(self, inputs):
@@ -70,11 +92,32 @@ class PoolingLayer:
         """
         outputs = []
         for input in inputs:
-            output = skimage.measure.block_reduce(input, (2, 2), np.max)
+            output = skimage.measure.block_reduce(input, (1, 2, 2), np.max)
             outputs.append(output)
         outputs = np.array(outputs)
         cache = (inputs, outputs)
         return outputs, cache
+
+    def backward(self, gradients_for_outputs, cache):
+        """
+        :param gradients_for_outputs: (N, height/2, width/2, depth)
+        :param cache: (inputs, outputs)
+        :return: (gradients_for_inputs, gradients_for_parameters)
+            gradients_for_inputs: (N, height, width, depth)
+            gradients_for_parameters: []
+        """
+        # (N, depth, height/2, width/2)
+        gradients_for_outputs = gradients_for_outputs.transpose((0, 3, 1, 2))
+
+        inputs, outputs = cache
+        inputs = inputs.transpose((0, 3, 1, 2))
+        outputs = outputs.transpose((0, 3, 1, 2))
+
+        gradients_for_outputs_repeated = gradients_for_outputs.repeat(2, axis=-1).repeat(2, axis=-2)
+        mask_maximum_reached = inputs == outputs.repeat(2, axis=-1).repeat(2, axis=-2)
+        gradients_for_inputs = gradients_for_outputs_repeated * mask_maximum_reached
+        return gradients_for_inputs, []
+
 
 class FCLayer:
     def forward(self, inputs, weights, biases):
@@ -87,6 +130,10 @@ class FCLayer:
             outputs: (N, C)
             cache: (inputs, weights, biases, outputs)
         """
+        N, height, width, depth = inputs.shape
+        assert weights.shape == (NUMBER_CLASSES, height * width * depth)
+        assert biases.shape == (NUMBER_CLASSES,)
+
         outputs = []
         for input in inputs:
             input_flatten = input.flatten()
@@ -98,7 +145,7 @@ class FCLayer:
 
     def backward(self, gradients_for_outputs, cache):
         """
-        :param gradients_for_output: (N, C)
+        :param gradients_for_outputs: (N, C)
         :param cache: (inputs, weights, biases, outputs)
         :return: (gradients_for_inputs, gradients_for_parameters)
             gradients_for_inputs: (N, height, width, depth)
@@ -132,6 +179,7 @@ class FCLayer:
         gradients_for_biases /= N
         return np.array(gradients_for_inputs)
 
+
 class SoftmaxLayer:
     def forward(self, inputs):
         """
@@ -154,7 +202,9 @@ class SoftmaxLayer:
         """
         :param gradients_for_output: (N, C)
         :param cache: (inputs, outputs)
-        :return: (N, C)
+        :return: (gradients_for_inputs, gradients_for_parameters)
+            gradients_for_inputs: (N, C)
+            gradients_for_parameters: []
         """
         inputs, outputs = cache
         gradients_for_inputs = []
@@ -165,7 +215,7 @@ class SoftmaxLayer:
             gradients_for_input = gradients_for_output @ jacobian
             gradients_for_inputs.append(gradients_for_input)
         gradients_for_inputs = np.mean(gradients_for_inputs, axis=0)
-        return gradients_for_inputs
+        return gradients_for_inputs, []
 
 
 """
@@ -250,7 +300,9 @@ class Model:
             gradients_for_outputs = gradients_for_softmax_outputs
             for layer, layout_parameters, cache in reversed(zip(self.layers, caches)):
                 gradients_for_inputs, gradients_for_parameters = layer.backward(gradients_for_outputs, cache)
-                layout_parameters[...] = layout_parameters - GRADIENT_STEP * gradients_for_parameters
+                assert len(layout_parameters) == len(gradients_for_parameters)
+                for layout_parameter, gradients_for_parameter in zip(layout_parameters, gradients_for_parameters):
+                    layout_parameter[...] = layout_parameter - GRADIENT_STEP * gradients_for_parameter
                 gradients_for_outputs = gradients_for_inputs
 
     def predict(self, x):
