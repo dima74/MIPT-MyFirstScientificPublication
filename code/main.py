@@ -4,15 +4,19 @@ import scipy.stats as sps
 import skimage.measure
 import mnist
 
+NUMBER_CLASSES = 10
+
 class ConvolutionLayer:
     FILTER_SIZE = 3
 
     def forward(self, inputs, weights, biases):
         """
-        :param input: (N, height, width, depth)
+        :param inputs: (N, height, width, depth)
         :param weights: (NUMBER_FILTERS, FILTER_SIZE, FILTER_SIZE, depth)
         :param biases: (NUMBER_FILTERS)
         :return: (outputs, cache)
+            outputs: (N, height, width, NUMBER_FILTERS)
+            cache: (inputs, weights, biases, outputs)
         """
         PADDING_SIZE = 1
         NUMBER_FILTERS = 7
@@ -46,6 +50,8 @@ class ReluLayer:
         """
         :param inputs: (N, height, width, depth)
         :return: (outputs, cache)
+            outputs: (N, height, width, depth)
+            cache: (inputs, outputs)
         """
         outputs = np.maximum(inputs, 0)
         cache = (inputs, outputs)
@@ -59,12 +65,14 @@ class PoolingLayer:
         """
         :param inputs: (N, height, width, depth)
         :return: (outputs, cache)
+            outputs: (N, height/2, width/2, depth)
+            cache: (inputs, outputs)
         """
         outputs = []
         for input in inputs:
             skimage.measure.block_reduce(input, (2, 2), np.max)
         cache = (inputs, outputs)
-        return outputs
+        return outputs, cache
 
 class FCLayer:
     def forward(self, inputs, weights, biases):
@@ -74,9 +82,9 @@ class FCLayer:
             C --- number classes, C = 10
         :param biases: (C)
         :return: (outputs, cache)
+            outputs: (N, C)
+            cache: (inputs, weights, biases, outputs)
         """
-        C = 10
-
         outputs = []
         for input in inputs:
             input_flatten = input.flatten()
@@ -85,6 +93,14 @@ class FCLayer:
 
         cache = (inputs, weights, biases, outputs)
         return outputs, cache
+
+    def backward(self, gradients_for_output, cache):
+        """
+        :param gradients_for_output: (C)
+        :param cache: (inputs, outputs)
+        :return: ()
+        """
+        pass
 
 class SoftmaxLayer:
     def forward(self, inputs):
@@ -101,13 +117,22 @@ class SoftmaxLayer:
         cache = (inputs, outputs)
         return outputs, cache
 
-    def backward(self, gradients, cache):
+    def backward(self, gradients_for_output, cache):
         """
-        :param gradients: (C)
-        :param cache:
-        :return:
+        :param gradients_for_output: (C)
+        :param cache: (inputs, outputs)
+        :return: (C)
         """
-        pass
+        inputs, outputs = cache
+        gradients_for_inputs = []
+        for input, output in zip(inputs, outputs):
+            input_exp = np.exp(input)
+            # (d(output_i) / d(input_j)
+            jacobian = -(input_exp.reshape((-1, 1)) @ input_exp.reshape((1, -1))) / (np.sum(input_exp) ** 2) + np.diag(output)
+            gradients_for_input = gradients_for_output @ jacobian
+            gradients_for_inputs.append(gradients_for_input)
+        gradients_for_inputs = np.mean(gradients_for_inputs, axis=0)
+        return gradients_for_inputs
 
 
 """
@@ -168,7 +193,6 @@ class Model:
     def train(self, x_train, y_train):
         NUMBER_GRADIENT_ITERATIONS = 100
         GRADIENT_STEP = 1e-3
-        NUMBER_CLASSES = 10
 
         assert x_train.shape == (28, 28, 1)
         for _ in range(NUMBER_GRADIENT_ITERATIONS):
@@ -209,6 +233,7 @@ def main():
     x_train = x_train.reshape((-1, 28, 28))
 
     model = Model()
-    model.train(x_train, y_train)
+    # model.train(x_train, y_train)
+    model.predict(x_test)
 
 main()
