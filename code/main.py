@@ -122,7 +122,7 @@ for i in tqdm(range(N)):
     # plt.show()
 X_new = np.array(X_new)
 
-with open('data_discrete_new/train.pickle', 'wb') as output:
+with open('data_matrixes/train.pickle', 'wb') as output:
     data = {
         'X_discrete_new': X_new,
         'X_discrete_old': X_train[:N],
