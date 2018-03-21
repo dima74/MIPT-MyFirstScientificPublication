@@ -1,8 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.stats as sps
 import skimage.measure
-import mnist
+from CNN_without_libraries import mnist
 
 NUMBER_CLASSES = 10
 
@@ -36,8 +35,7 @@ class ConvolutionLayer:
             for filter_index, filter_weight, filter_bias in enumerate(zip(weights, biases)):
                 for i in range(output_size):
                     for j in range(output_size):
-                        # filter_weight = np.zeros((FILTER_SIZE, FILTER_SIZE, input_depth))
-                        # filter_bias = 0
+                        assert filter_weight.shape == (self.FILTER_SIZE, self.FILTER_SIZE, input_depth)
                         filter_input = input_padded[i:i + self.FILTER_SIZE, j:j + self.FILTER_SIZE, :]
                         output[filter_index][i][j] = (filter_weight * filter_input).sum() + filter_bias
             outputs.append(output)
@@ -50,8 +48,10 @@ class ConvolutionLayer:
         :param gradients_for_outputs: (N, depth, height, width)
         :param cache: (inputs, weights, biases, outputs)
         :return: (gradients_for_inputs, gradients_for_parameters)
-            gradients_for_inputs:
-            gradients_for_parameters:
+            gradients_for_inputs: (N, depth, height, width)
+            gradients_for_parameters: (gradients_for_weights, gradients_for_biases)
+                gradients_for_weights: (C, height*width*depth)
+                gradients_for_biases: (C)
         """
         pass
 
