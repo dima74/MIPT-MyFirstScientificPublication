@@ -104,19 +104,29 @@ def skeleton_to_discrete(skeleton):
             result[i][j] = find_max_radius(x, y)
     return result
 
-# X_train, y_train, X_train_skeleton = read_data('data/train_info')
-X_test, y_test, X_test_skeleton = read_data('data/test_info')
+X_train, y_train, X_train_skeleton = read_data('data/train_info')
+# X_test, y_test, X_test_skeleton = read_data('data/test_info')
 
 # with open('single-image.pickle', 'rb') as input:
 #     data = pickle.load(input)
 #     x, x_skeleton = data['x'], data['x_skeleton']
 
-X_skeleton = X_test_skeleton
-# for x_skeleton in tqdm(X_skeleton):
-for x_skeleton in X_skeleton:
-    image = skeleton_to_discrete(x_skeleton)
-    plt.figure()
-    im = plt.imshow(image, cmap='gray')
-    plt.colorbar(im, orientation='horizontal')
-    plt.show()
-    break
+N = 100
+X_new = []
+for i in tqdm(range(N)):
+    x_new = skeleton_to_discrete(X_train_skeleton[i])
+    X_new.append(x_new)
+    # plt.figure()
+    # im = plt.imshow(image, cmap='gray')
+    # plt.colorbar(im, orientation='horizontal')
+    # plt.show()
+X_new = np.array(X_new)
+
+with open('data_discrete_new/train.pickle', 'wb') as output:
+    data = {
+        'X_discrete_new': X_new,
+        'X_discrete_old': X_train[:N],
+        'X_skeleton': X_train_skeleton[:N],
+        'y': y_train[:N]
+    }
+    pickle.dump(data, output, protocol=pickle.HIGHEST_PROTOCOL)

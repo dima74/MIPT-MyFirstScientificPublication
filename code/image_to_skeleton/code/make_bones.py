@@ -14,17 +14,17 @@ if os.system("cd ./PatternSpectrumConsole && make") == 0:
 else:
     print(colored("MAKE FAILED", 'red'))
     sys.exit()
-    
+
 for filename in sys.argv[3:]:
     print(colored("-------------------------------------", "magenta"))
     print(colored("Processing {0}".format(filename), "blue"))
-    
+
     if os.system("python3 gen_filestxt.py ./{0}".format(filename)) == 0:
         print(colored("Generate file with pictures paths and names OK", 'green'))
     else:
         print(colored("Generate file with pictures paths and names  FAILED", 'red'))
         sys.exit()
-        
+
     #class_type = filename[:filename.find('_')]
     class_type = filename.replace(os.sep, '').replace('.', '')
     print(class_type)
@@ -34,7 +34,7 @@ for filename in sys.argv[3:]:
     else:
         print(colored("Copy files with path to PatternSpectrumConsole FAILED", "red"))
         sys.exit()
-        
+
     print(colored("Processing PatternSpectrum for bones", "yellow"))
     start = time.time()
     name = "bones" + str(idx)
@@ -42,7 +42,7 @@ for filename in sys.argv[3:]:
         print(colored("Processing PatternSpectrum for bones OK", "green"))
     else:
         print(colored("Processing PatternSpectrum for bones FAILED", "red"))
-        sys.exit()        
+        sys.exit()
     print(colored("PROCESSING TIME: {0} s".format(time.time() - start), "magenta"))
     if os.system("mv ./PatternSpectrumConsole/{0}_{1}.txt ./{0}_{1}.txt".format(class_type, name)) == 0:
         print(colored("Move files bones to ./ OK", "green"))
