@@ -125,6 +125,9 @@ def skeleton_to_discrete(skeleton):
         # https://stackoverflow.com/a/30408825/5812238
         cycle_area = 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
 
+    # поиск прямых линий
+    ...
+
     def generate_features(node, node_features0):
         x, y, degree, radial = node_features0
         node_features = []
