@@ -115,6 +115,8 @@ def skeleton_to_discrete(skeleton):
                 elif dfs_state == 2:
                     return 2, None
         return 0, None
+    dfs(0, -1)
+
     # площадь цикла
     if cycle is None:
         cycle_area = 0
@@ -154,13 +156,14 @@ def skeleton_to_discrete(skeleton):
         node_features += [min_angle]
 
         # number_cycles & cycle_area
-        number_cycles = 0
-        total_cycles_area = 0
-        if node in cycle:
-            number_cycles += 1
-            total_cycles_area += cycle_area
-        node_features += [number_cycles]
-        node_features += [0 if number_cycles == 0 else total_cycles_area / number_cycles]
+        if (cycle is not None) and (node in cycle):
+            node_number_cycles = 1
+            node_cycle_area = cycle_area
+        else:
+            node_number_cycles = 0
+            node_cycle_area = 0
+        node_features += [node_number_cycles]
+        node_features += [node_cycle_area]
 
         # расстояние/минимальное расстояние до вершины степени 1
         # суммарный угол поворота на пути до ближайшей вершины степени 1
