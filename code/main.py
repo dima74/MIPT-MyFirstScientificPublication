@@ -59,13 +59,19 @@ def convert_skeleton(skeleton):
     return nodes, adjacency_matrix
 
 # исследуемые символы
-# abcdefghijklmnopqrstuvwxyz 0123456789
+# 0123456789
+# abcdefghijklmnopqrstuvwxyz
+# ABCDEFGHIJKLMNOPQRSTUVWXYZ
 
 # символы с циклами
-# abdgopq 04689
+# 04689
+# abdgopq
+# BDOPQR
 
 # символы без циклов
-# cefhijklmnrstuvwxyz 12357
+# 12357
+# cefhijklmnrstuvwxyz
+# ACEFGHIJKLMNSTUVWXYZ
 
 def skeleton_to_discrete(skeleton):
     """
@@ -171,6 +177,7 @@ def skeleton_to_discrete(skeleton):
         # расстояние/минимальное расстояние до вершины степени 1
         # суммарный угол поворота на пути до ближайшей вершины степени 1
         # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия --- путь в графе, такой что каждый угол примерно 180)
+        # наличие вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
 
 
     nodes_features = list(map(generate_features, enumerate(nodes)))
