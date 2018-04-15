@@ -3,12 +3,19 @@
 ## `/1_data_discrete`
 * папка `generated` — получаю от Андрея, содержит дискретное описание изображения в numpy формате
 * папка `as_png` — создаётся после запуска `convert_to_directory_with_png_files.py`, содержит файлы изображений в формате PNG
-* файл `data.npy` — создаётся после запуска `convert_to_single_numpy_file`, содержит словарь
+* файл `data.pickle` — создаётся после запуска `convert_to_single_numpy_file`, содержит словарь
  
         {
             'I': (None, 64, 64),
             'y': (None, 1),
         }
+
+Код для чтения:
+
+    import pickle
+    with open('1_data_discrete/data.pickle', 'rb') as input:
+        data = pickle.load(input)
+    I, y = data['I'], data['y']
 
 ## `/2_skeleton_creator`
 * файл `skeletons.npy` — создаётся после запуска `run.sh`, содержит массив скелетов

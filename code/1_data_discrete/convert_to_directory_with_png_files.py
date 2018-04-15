@@ -1,5 +1,8 @@
 from generated.data_loader import load_data_discrete
-X, y = load_data_discrete(size=1000)
+X, y = load_data_discrete(path='generated', size=1000)
+
+import os
+os.mkdir('as_png')
 
 import matplotlib
 import matplotlib.pyplot as plt
