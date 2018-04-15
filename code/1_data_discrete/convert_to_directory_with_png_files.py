@@ -1,5 +1,5 @@
-from as_numpy.data_loader import load_data_discrete
-X, y = load_data_discrete(path='as_numpy', size=1000)
+from generated.data_loader import load_data_discrete
+X, y = load_data_discrete(size=1000)
 
 import matplotlib
 import matplotlib.pyplot as plt
