@@ -18,10 +18,10 @@
     I, y = data['I'], data['y']
 
 ## `/2_skeleton_creator`
-* файл `skeletons.npy` — создаётся после запуска `run.sh`, содержит массив скелетов
+* файл `skeletons.npy` — создаётся после запуска `run.sh`, содержит массив скелетов (каждый скелет --- массив вещественных чисел)
 
 ## `/3_features_generator`
-* файл `features.npy` — создаётся после запуска `features_generator.py`, содержит словарь
+* файл `features.pickle` — создаётся после запуска `features_generator.py`, содержит словарь
 
         {
             'F': [{

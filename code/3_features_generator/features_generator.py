@@ -207,7 +207,7 @@ result = {
         } for nodes_features, adjacency_list in features
     ]
 }
-np.save('features.npy', features)
+pickle.dump('features.pickle', features)
 
 # with open('single-image.pickle', 'rb') as input:
 #     data = pickle.load(input)

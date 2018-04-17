@@ -1,5 +1,5 @@
 from generated.data_loader import load_data_discrete
-X, y = load_data_discrete(path='generated', size=7)
+X, y = load_data_discrete(path='generated', size=1000)
 
 import pickle
 data = {
