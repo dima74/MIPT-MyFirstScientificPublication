@@ -16,7 +16,7 @@ skeletons_reordered = [None] * len(skeletons)
 for skeleton, index_right in zip(skeletons, indexes):
     skeletons_reordered[index_right] = skeleton
 
-np.save('skeletons.npy', skeletons)
+np.save('skeletons.npy', skeletons_reordered)
 
 # import matplotlib
 # matplotlib.use('TkAgg')

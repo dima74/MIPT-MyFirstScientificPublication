@@ -30,8 +30,21 @@ plt.rcParams['figure.figsize'] = (10, 7)
 #         X, y, X_skeleton = data['data'], data['labels'], data['skel_features']
 #         return X, y, X_skeleton
 
+# for debug only, pretty print skeleton
+def pps(skeleton):
+    result = []
+    for i in range(0, len(skeleton), 8):
+        node0 = skeleton[i + 4 * 0:i + 4 * 1]
+        node1 = skeleton[i + 4 * 1:i + 4 * 2]
+        result.append((node0, node1))
+    return result
 
+
+q = 0
 def convert_skeleton(skeleton):
+    global q
+    print(q)
+    q += 1
     """
     :return: (nodes, edges)
         nodes: [(x, y, degree, radial)]
@@ -39,16 +52,18 @@ def convert_skeleton(skeleton):
     """
 
     nodes = []
-    coordinates_to_nodes = {}
+    # description == (x, y, degree, radial)
+    descriptions_to_nodes = {}
     def convert_node(node):
         """ получает вершину в виде (x, y, degree, radial), сохраняет её в список вершин и возвращает индекс этой ввершины """
-        x, y, degree, radial = node
-        if (x, y) in coordinates_to_nodes:
-            return coordinates_to_nodes[(x, y)]
+        # x, y, degree, radial = node
+        node = tuple(node)
+        if node in descriptions_to_nodes:
+            return descriptions_to_nodes[node]
         else:
             node_index = len(nodes)
-            nodes.append((x, y, degree, radial))
-            coordinates_to_nodes[(x, y)] = node_index
+            nodes.append(node)
+            descriptions_to_nodes[node] = node_index
             return node_index
 
     edges = []
@@ -62,6 +77,19 @@ def convert_skeleton(skeleton):
     for node0, node1 in edges:
         adjacency_list[node0].append(node1)
         adjacency_list[node1].append(node0)
+    for node_index, node in enumerate(nodes):
+        if node[2] != len(adjacency_list[node_index]):
+            import sys
+            sys.path.insert(0, '/home/dima/6science/MyFirstScientificPublication/code/visualization')
+            import visualization.draw_skeleton
+            draw_skeleton(nodes, adjacency_list)
+        assert node[2] == len(adjacency_list[node_index])
+
+    # import sys
+    # sys.path.insert(0, '/home/dima/6science/MyFirstScientificPublication/code')
+    # from visualization.visualization import draw_skeleton
+    # draw_skeleton(nodes, adjacency_list)
+
     return nodes, adjacency_list
 
 # наличие вершины степени три
