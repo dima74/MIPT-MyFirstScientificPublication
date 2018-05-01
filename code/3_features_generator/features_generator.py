@@ -124,6 +124,8 @@ def generate_features(skeleton):
 
 
 class FeaturesGenerator:
+    debug_number_skeletons_without_vertexes_with_degree_one = 0
+
     def __init__(self, skeleton):
         nodes, adjacency_list = convert_skeleton(skeleton)
         self.nodes = np.array(nodes)
@@ -151,18 +153,18 @@ class FeaturesGenerator:
         # угол между (u1, v1) и (u2, v2)
         u1, v1 = edge1
         u2, v2 = edge2
-        def normalize_edge(u, v):
+        def get_edge_vector(u, v):
             x_u, y_u, _, _ = self.nodes[u]
             x_v, y_v, _, _ = self.nodes[v]
-            delta_x = x_u - x_v
-            delta_y = y_u - y_v
-            delta_length = math.sqrt(delta_x * delta_x + delta_y * delta_y)
-            return (delta_x / delta_length, delta_y / delta_length)
-        x1, y1 = normalize_edge(u1, v1)
-        x2, y2 = normalize_edge(u2, v2)
+            x_delta = x_u - x_v
+            y_delta = y_u - y_v
+            return x_delta, y_delta
+        x1, y1 = get_edge_vector(u1, v1)
+        x2, y2 = get_edge_vector(u2, v2)
+        # https://stackoverflow.com/a/16544330/5812238
         dot_product = x1 * x2 + y1 * y2
-        # https://stackoverflow.com/a/13849249/5812238
-        return math.acos(np.clip(dot_product, -1, +1))
+        cross_product = x1 * y2 - y1 * x2
+        return math.atan2(cross_product, dot_product)
 
     ################################################
     # методы для всего графа
@@ -181,6 +183,13 @@ class FeaturesGenerator:
         for node in range(len(self.nodes)):
             if len(self.adjacency_list[node]) == 1:
                 heappush(queue, [0, node, -1])
+        if len(queue) == 0:
+            # нет вершин степени 1
+            # TODO подумать что делать в таком случае
+            self.distances_to_one_degree_node = [0] * len(self.nodes)
+            self.angles_sum_on_path_one_degree_node = [0] * len(self.nodes)
+            FeaturesGenerator.debug_number_skeletons_without_vertexes_with_degree_one += 1
+            return
         while len(queue) > 0:
             distance, node, previous_node = heappop(queue)
             if distances[node] is None:
@@ -196,23 +205,24 @@ class FeaturesGenerator:
         def update_angle(node):
             # возвращает пару (сумма_углов, предыдущая_вершина)
             previous_node = previous_nodes[node]
-            assert previous_node is not None
+            # TODO проверить, что assert падает только на вершинах степени ноль
+            # assert previous_node is not None
             angles_sum = angles_sum_on_path_one_degree_node[node]
             if angles_sum is None:
-                if previous_node == -1:
-                    # вершина степени один
+                if previous_node == -1 or previous_node is None:
+                    # вершина степени один или ноль или ?
                     angles_sum = 0
                 else:
                     previous_angles_sum, node1 = update_angle(previous_node)
                     node2 = previous_node
                     node3 = node
-                    angles_sum = previous_angles_sum + self.get_angle_between_edges((node1, node2), (node2, node3))
+                    angle_between_last_edges = 0 if node1 == -1 else self.get_angle_between_edges((node1, node2), (node2, node3))
+                    angles_sum = previous_angles_sum + angle_between_last_edges
             angles_sum_on_path_one_degree_node[node] = angles_sum
             return angles_sum, previous_node
         for node in range(len(self.nodes)):
             update_angle(node)
         self.angles_sum_on_path_one_degree_node = angles_sum_on_path_one_degree_node
-        print(angles_sum_on_path_one_degree_node)
 
     def find_cycles(self):
         # поиск цикла (ищем только первый цикл, так как больше одного цикла почти не бывает (толко у цифры 8))
@@ -281,8 +291,8 @@ class FeaturesGenerator:
         node_features += [degree]
         node_features += [radial]
         node_features += [self.node_min_angle(node, x, y, degree, radial)]
-        node_features += self.node_cycles_features(node, x, y, degree, radial)
-        node_features += [self.one_degree_node_features(node, x, y, degree, radial)]
+        node_features += self.get_cycles_features(node, x, y, degree, radial)
+        node_features += self.get_one_degree_node_features(node, x, y, degree, radial)
 
         # сумма углов поворота между рёбрами на пути к ближайшей вершине степени один
         # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия — путь в графе, такой что угол между каждой парой соседних рёбер отличается не более чем на 10 от 180)
@@ -311,7 +321,7 @@ class FeaturesGenerator:
             assert False
         return min_angle
 
-    def node_cycles_features(self, node, x, y, degree, radial):
+    def get_cycles_features(self, node, x, y, degree, radial):
         # number_cycles & cycle_area
         if (self.cycle is not None) and (node in self.cycle):
             node_number_cycles = 1
@@ -321,15 +331,17 @@ class FeaturesGenerator:
             node_cycle_area = 0
         return [node_number_cycles, node_cycle_area]
 
-    def one_degree_node_features(self, node, x, y, degree, radial):
+    def get_one_degree_node_features(self, node, x, y, degree, radial):
         # минимальное расстояние до вершины степени 1
-        return self.distances_to_one_degree_node[node]
+        return [self.distances_to_one_degree_node[node], self.angles_sum_on_path_one_degree_node[node]]
 
 
-skeletons = np.load('single_skeleton.npy')
-# skeletons = np.load('../2_skeleton_creator/skeletons.npy')
-# features = list(map(generate_features, tqdm(skeletons)))
-features = list(map(generate_features, skeletons))
+# for debug
+# skeletons = np.load('single_skeleton.npy')
+# features = list(map(generate_features, skeletons))
+
+skeletons = np.load('../2_skeleton_creator/skeletons.npy')
+features = list(map(generate_features, tqdm(skeletons)))
 result = {
     'F': [
         {
@@ -342,9 +354,4 @@ result = {
 with open('features.pickle', 'wb') as output:
     pickle.dump(result, output)
 
-# with open('single-image.pickle', 'rb') as input:
-#     data = pickle.load(input)
-#     x, x_skeleton = data['x'], data['x_skeleton']
-#
-# x_new = generate_features(x_skeleton)
-# print(x_new)
+print('предупреждение: доля скелетов без вершин степени один равна', FeaturesGenerator.debug_number_skeletons_without_vertexes_with_degree_one / len(skeletons))
