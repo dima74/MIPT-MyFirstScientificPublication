@@ -206,12 +206,13 @@ class FeaturesGenerator:
                     previous_angles_sum, node1 = update_angle(previous_node)
                     node2 = previous_node
                     node3 = node
-                    angles_sum = previous_angles_sum + self.get_angle_between_edges((node1, node2), (node2, node3))  # угол между 12 и 23
+                    angles_sum = previous_angles_sum + self.get_angle_between_edges((node1, node2), (node2, node3))
             angles_sum_on_path_one_degree_node[node] = angles_sum
             return angles_sum, previous_node
-
         for node in range(len(self.nodes)):
             update_angle(node)
+        self.angles_sum_on_path_one_degree_node = angles_sum_on_path_one_degree_node
+        print(angles_sum_on_path_one_degree_node)
 
     def find_cycles(self):
         # поиск цикла (ищем только первый цикл, так как больше одного цикла почти не бывает (толко у цифры 8))
