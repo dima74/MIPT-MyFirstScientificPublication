@@ -117,14 +117,6 @@ def generate_features(skeleton):
     """
     :return: (nodes_features, edges)
         nodes_features: [(feature1, feature2, ...)]
-            features:
-                degree --- степень вершины, от 1 до 3
-                radial --- значение радиальной функции в вершине
-                number_cycles --- число циклов, в которых содержится вершина (по сути это бинарное свойство, так как два цикла только у цифры 8)
-                circle_area --- площадь области, ограниченной циклом. среднее площадей, если циклов несколько
-                min_angle --- значение минимального угла между рёбрами, выходящими из вершины
-                ...
-
         edges: [(node1_index, node2_index)]
     """
     features_generator = FeaturesGenerator(skeleton)
@@ -140,12 +132,41 @@ class FeaturesGenerator:
     def generate_features(self):
         self.find_cycles()
         # self.find_straight_lines()
+        self.calculate_distances_from_one_degree_nodes()
         nodes_features = [self.generate_node_features(node_index, node_features0) for node_index, node_features0 in enumerate(self.nodes)]
         nodes_features = np.array(nodes_features)
         return nodes_features, self.adjacency_list
 
     ################################################
     # методы для всего графа
+
+    def get_nodes_distance(self, node1, node2):
+        x1, y1, _, _ = self.nodes[node1]
+        x2, y2, _, _ = self.nodes[node2]
+        delta_x = x1 - x2
+        delta_y = y1 - y2
+        return math.sqrt(delta_x * delta_x + delta_y * delta_y)
+
+    def calculate_distances_from_one_degree_nodes(self):
+        # для каждой вершины хотим найти кратчайшее расстояние от неё до вершины степени один
+        # дейкстра с начальными вершинами --- всеми вершинами степени 1
+
+        from heapq import heappush, heappop
+        queue = []
+        distances = [None] * len(self.nodes)
+        for node in range(len(self.nodes)):
+            if len(self.adjacency_list[node]) == 1:
+                heappush(queue, [0, node])
+
+        while len(queue) > 0:
+            distance, node = heappop(queue)
+            if distances[node] is None:
+                distances[node] = distance
+                for neighbour in self.adjacency_list[node]:
+                    if distances[neighbour] is None:
+                        distance_new = distance + self.get_nodes_distance(node, neighbour)
+                        heappush(queue, [distance_new, neighbour])
+        self.distances_to_one_degree_node = distances
 
     def find_cycles(self):
         # поиск цикла (ищем только первый цикл, так как больше одного цикла почти не бывает (толко у цифры 8))
@@ -195,6 +216,15 @@ class FeaturesGenerator:
     # методы для одной вершины
 
     def generate_node_features(self, node, node_features0):
+        """
+        features:
+            degree --- степень вершины, от 1 до 3
+            radial --- значение радиальной функции в вершине
+            min_angle --- значение минимального угла между рёбрами, выходящими из вершины
+            number_cycles --- число циклов, в которых содержится вершина (по сути это бинарное свойство, так как два цикла только у цифры 8)
+            circle_area --- площадь области, ограниченной циклом. среднее площадей, если циклов несколько
+            distance_to_one_degree_node --- минимальное расстояние до вершины степени 1
+        """
         x, y, degree, radial = node_features0
         # TODO посмотреть как же так получается что степени вершин не совпадают
         # assert degree == len(adjacency_list[node])
@@ -206,8 +236,8 @@ class FeaturesGenerator:
         node_features += [radial]
         node_features += [self.node_min_angle(node, x, y, degree, radial)]
         node_features += self.node_cycles_features(node, x, y, degree, radial)
+        node_features += [self.distances_to_one_degree_node[node]]  # минимальное расстояние до вершины степени 1
 
-        # расстояние/минимальное расстояние до вершины степени 1
         # суммарный угол поворота на пути до ближайшей вершины степени 1
         # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия --- путь в графе, такой что каждый угол примерно 180)
         # наличие вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
@@ -254,8 +284,10 @@ class FeaturesGenerator:
         return [node_number_cycles, node_cycle_area]
 
 
-skeletons = np.load('../2_skeleton_creator/skeletons.npy')
-features = list(map(generate_features, tqdm(skeletons)))
+skeletons = np.load('single_skeleton.npy')
+# skeletons = np.load('../2_skeleton_creator/skeletons.npy')
+# features = list(map(generate_features, tqdm(skeletons)))
+features = list(map(generate_features, skeletons))
 result = {
     'F': [
         {
