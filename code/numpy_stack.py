@@ -1,1 +1,0 @@
-/home/dima/6any/numpy_stack.py

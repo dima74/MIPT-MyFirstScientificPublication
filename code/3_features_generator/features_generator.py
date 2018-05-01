@@ -10,6 +10,7 @@ import itertools
 import collections
 import pickle
 import math
+from collections import Counter
 
 np.set_printoptions(linewidth=10 ** 7)
 pd.set_option('display.width', None)
@@ -79,7 +80,7 @@ def convert_skeleton(skeleton):
         adjacency_list[node0].append(node1)
         adjacency_list[node1].append(node0)
 
-    # некоторая отладка для изучения того, почему записанноая степень вершины отличается от актуально
+    # некоторая отладка для изучения того, почему записанная степень вершины отличается от актуальной
     # можно удалить это
     for node_index, node in enumerate(nodes):
         if node[2] != len(adjacency_list[node_index]):
@@ -90,8 +91,9 @@ def convert_skeleton(skeleton):
             # вернуть идентификацию вершин только по координатам
             # import sys
             # sys.path.insert(0, '/home/dima/6science/MyFirstScientificPublication/code')
-            from visualization.visualization import draw_skeleton
+            # from visualization.visualization import draw_skeleton
             # draw_skeleton(nodes, adjacency_list)
+            pass
         # assert node[2] == len(adjacency_list[node_index])
 
     return nodes, adjacency_list
@@ -124,7 +126,13 @@ def generate_features(skeleton):
 
 
 class FeaturesGenerator:
-    debug_number_skeletons_without_vertexes_with_degree_one = 0
+    debug_number_nodes = 0
+    debug_number_nodes_in_straight_lines = 0
+    debug_straight_lines_lengths = []
+    debug_straight_lines_sizes = []
+    debug_number_skeletons_without_nodes_with_degree_one = 0
+    STRAIGHT_LINES_ANGLE_THRESHOLD = np.deg2rad(10)
+    STRAIGHT_LINES_LENGTH_THRESHOLD = 10  # размер квадрата, в котором лежит скелет --- 64
 
     def __init__(self, skeleton):
         nodes, adjacency_list = convert_skeleton(skeleton)
@@ -133,8 +141,8 @@ class FeaturesGenerator:
 
     def generate_features(self):
         self.find_cycles()
-        # self.find_straight_lines()
         self.calculate_one_degree_nodes_features()
+        self.find_straight_lines()
         nodes_features = [self.generate_node_features(node_index, node_features0) for node_index, node_features0 in enumerate(self.nodes)]
         nodes_features = np.array(nodes_features)
         return nodes_features, self.adjacency_list
@@ -142,7 +150,7 @@ class FeaturesGenerator:
     ################################################
     # служебные функции
 
-    def get_nodes_distance(self, node1, node2):
+    def get_edge_length(self, node1, node2):
         x1, y1, _, _ = self.nodes[node1]
         x2, y2, _, _ = self.nodes[node2]
         delta_x = x1 - x2
@@ -188,7 +196,7 @@ class FeaturesGenerator:
             # TODO подумать что делать в таком случае
             self.distances_to_one_degree_node = [0] * len(self.nodes)
             self.angles_sum_on_path_one_degree_node = [0] * len(self.nodes)
-            FeaturesGenerator.debug_number_skeletons_without_vertexes_with_degree_one += 1
+            FeaturesGenerator.debug_number_skeletons_without_nodes_with_degree_one += 1
             return
         while len(queue) > 0:
             distance, node, previous_node = heappop(queue)
@@ -197,7 +205,7 @@ class FeaturesGenerator:
                 previous_nodes[node] = previous_node
                 for neighbour in self.adjacency_list[node]:
                     if distances[neighbour] is None:
-                        distance_new = distance + self.get_nodes_distance(node, neighbour)
+                        distance_new = distance + self.get_edge_length(node, neighbour)
                         heappush(queue, [distance_new, neighbour, node])
         self.distances_to_one_degree_node = distances
 
@@ -223,6 +231,82 @@ class FeaturesGenerator:
         for node in range(len(self.nodes)):
             update_angle(node)
         self.angles_sum_on_path_one_degree_node = angles_sum_on_path_one_degree_node
+
+    def find_straight_lines(self):
+        # прямая линия — путь в графе, такой что угол между каждой парой соседних рёбер отличается не более чем на 10° от 180°
+
+        # TODO сколько прямых линий на самом деле непрямые?
+        #      (например, 10 рёбер, между каждыми двумя угол поворота меньше 10, в итоге получаем «прямую линию» с углом поворота >90)
+        #      может стоит не рассматривать такие линии, или вообще как-нибудь изменить алгоритм поиска прямых линий, чтобы это учитывалось
+
+        # для каждой прямой линии нас будет интересовать её длина и угол относительно горизонтали
+        self.node_straight_lines_features = [(0, 0) for _ in range(len(self.nodes))]
+
+        # каждой вершине сопоставляем линию (массив вершин), которой вершина принадлежит
+        nodes_line = [None] * len(self.nodes)
+        # каждой вершине v сопоставляем пару смежных с ней вершин (u, w), таких что путь (u, v, w) является (частью) прямой линией
+        nodes_line_part = [None] * len(self.nodes)
+
+        for node in range(len(self.nodes)):
+            if len(self.adjacency_list[node]) < 2:
+                continue
+            neighbours_pairs = [(self.get_angle_between_edges((neighbour1, node), (node, neighbour2)), neighbour1, neighbour2)
+                                for neighbour1, neighbour2 in itertools.combinations(self.adjacency_list[node], 2)]
+            neighbours_pairs.sort()
+            # выбираем одну лучшею пару, так как считаем что через вершину степени три не может проходить две прямых линии
+            angle, neighbour1, neighbour2 = neighbours_pairs[0]
+            if abs(angle) < FeaturesGenerator.STRAIGHT_LINES_ANGLE_THRESHOLD:
+                nodes_line_part[node] = (neighbour1, neighbour2)
+
+        used_in_continue_line = np.full(len(self.nodes), False)
+        def continue_line(node, previous_node, current_line):
+            # продолжает прямую линию от previous_node к node и возвращает массив [node, ...]
+            current_line.append(node)
+            node_line_part = nodes_line_part[node]
+            if node_line_part is None or nodes_line[node] is not None or used_in_continue_line[node]:
+                return current_line
+            used_in_continue_line[node] = True
+            node1, node2 = node_line_part
+            if node1 != previous_node and node2 != previous_node:
+                return current_line
+            next_node = node1 if node1 != previous_node else node2
+            return continue_line(next_node, node, current_line)
+        def get_line_length_and_angle_between_horizontal(line):
+            length = 0
+            # угол считается как взвешенная (по длине ребра) сумма углов рёбер
+            angle_weighted = 0
+            for node1, node2 in zip(line[:-1], line[1:]):
+                current_length = self.get_edge_length(node1, node2)
+                length += current_length
+                x1, y1, _, _ = self.nodes[node1]
+                x2, y2, _, _ = self.nodes[node2]
+                current_angle_weighted = math.atan2(y2 - y1, x2 - x1)
+                if current_angle_weighted < 0:
+                    current_angle_weighted += math.pi
+                angle_weighted += current_angle_weighted * current_length
+            angle = angle_weighted / length
+            return length, angle
+        for node in range(len(self.nodes)):
+            FeaturesGenerator.debug_number_nodes += 1
+            if nodes_line[node] is None:
+                node_line_part = nodes_line_part[node]
+                if node_line_part is not None:
+                    node1, node2 = node_line_part
+                    used_in_continue_line[node] = True
+                    line1 = continue_line(node1, node, [])
+                    line2 = continue_line(node2, node, [])
+                    node_line = [*line1[::-1], node, *line2]
+                    node_line_length, node_line_angle = get_line_length_and_angle_between_horizontal(node_line)
+                    if node_line_length < FeaturesGenerator.STRAIGHT_LINES_LENGTH_THRESHOLD:
+                        # не рассматриваем слишком короткие линии
+                        continue
+                    for v in node_line:
+                        FeaturesGenerator.debug_number_nodes_in_straight_lines += 1
+                        nodes_line[v] = node_line
+                        self.node_straight_lines_features[v] = (node_line_length, node_line_angle)
+                    FeaturesGenerator.debug_straight_lines_lengths.append(node_line_length)
+                    FeaturesGenerator.debug_straight_lines_sizes.append(len(node_line))
+        self.nodes_line = nodes_line
 
     def find_cycles(self):
         # поиск цикла (ищем только первый цикл, так как больше одного цикла почти не бывает (толко у цифры 8))
@@ -290,18 +374,16 @@ class FeaturesGenerator:
         node_features = []
         node_features += [degree]
         node_features += [radial]
-        node_features += [self.node_min_angle(node, x, y, degree, radial)]
+        node_features += [self.get_min_angle_between_adjacent_edges(node, x, y, degree, radial)]
         node_features += self.get_cycles_features(node, x, y, degree, radial)
         node_features += self.get_one_degree_node_features(node, x, y, degree, radial)
+        node_features += self.get_straight_lines_node_features(node, x, y, degree, radial)
 
-        # сумма углов поворота между рёбрами на пути к ближайшей вершине степени один
-        # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия — путь в графе, такой что угол между каждой парой соседних рёбер отличается не более чем на 10 от 180)
-        # наличие вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
-        # число связных компонент
+        # TODO признак наличия вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме скелетонизации ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
+        # TODO число связных компонент
         return node_features
 
-
-    def node_min_angle(self, node, x, y, degree, radial):
+    def get_min_angle_between_adjacent_edges(self, node, x, y, degree, radial):
         def angle_between_neighbours(neighbour1, neighbour2):
             neighbour1 = self.adjacency_list[node][neighbour1]
             neighbour2 = self.adjacency_list[node][neighbour2]
@@ -332,8 +414,18 @@ class FeaturesGenerator:
         return [node_number_cycles, node_cycle_area]
 
     def get_one_degree_node_features(self, node, x, y, degree, radial):
-        # минимальное расстояние до вершины степени 1
-        return [self.distances_to_one_degree_node[node], self.angles_sum_on_path_one_degree_node[node]]
+        return [
+            # минимальное расстояние до вершины степени 1
+            self.distances_to_one_degree_node[node],
+            # сумма углов поворота между рёбрами на пути к ближайшей вершине степени один
+            self.angles_sum_on_path_one_degree_node[node]
+        ]
+
+    def get_straight_lines_node_features(self, node, x, y, degree, radial):
+        # пара
+        #   длина максимальной прямой линии, в которой содержится текущая вершина
+        #   угол между максимальной прямой линией и горизонталью
+        return self.node_straight_lines_features[node]
 
 
 # for debug
@@ -348,10 +440,32 @@ result = {
             'nodes_features': nodes_features,
             'adjacency_list': adjacency_list
         } for nodes_features, adjacency_list in features
+    ],
+    'F_nodes_features_description': [
+        'degree',
+        'radial',
+        'min_angle_between_adjacent_edges',
+        'number_cycles',
+        'cycle_area',
+        'distances_to_one_degree_node',
+        'angles_sum_on_path_one_degree_node',
+        'straight_line_length',
+        'straight_line_angle_between_horizontal'
     ]
 }
 
 with open('features.pickle', 'wb') as output:
     pickle.dump(result, output)
 
-print('предупреждение: доля скелетов без вершин степени один равна', FeaturesGenerator.debug_number_skeletons_without_vertexes_with_degree_one / len(skeletons))
+print('предупреждение: доля скелетов без вершин степени один равна', FeaturesGenerator.debug_number_skeletons_without_nodes_with_degree_one / len(skeletons))
+print('доля вершин, входящих в какую-нибудь прямую линию', FeaturesGenerator.debug_number_nodes_in_straight_lines / FeaturesGenerator.debug_number_nodes)
+
+# plt.figure()
+# plt.hist(FeaturesGenerator.debug_straight_lines_sizes, bins=20)
+# plt.title('Гистограмма числа вершин в прямых линиях')
+# plt.show()
+
+# plt.figure()
+# plt.hist(FeaturesGenerator.debug_straight_lines_lengths, bins=20)
+# plt.title('Гистограмма длин прямых линий')
+# plt.show()
