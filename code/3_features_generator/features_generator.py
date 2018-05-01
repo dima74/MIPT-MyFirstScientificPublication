@@ -113,9 +113,6 @@ def convert_skeleton(skeleton):
 # большая:    0oDOQ
 # маленькая:  4689abdgpqBPR
 
-
-
-
 def generate_features(skeleton):
     """
     :return: (nodes_features, edges)
@@ -130,73 +127,101 @@ def generate_features(skeleton):
 
         edges: [(node1_index, node2_index)]
     """
-    nodes, adjacency_list = convert_skeleton(skeleton)
-    nodes = np.array(nodes)
+    features_generator = FeaturesGenerator(skeleton)
+    return features_generator.generate_features()
 
-    # поиск цикла (ищем только первый цикл, так как больше одного цикла почти не бывает (толко у цифры 8))
-    cycle = None
-    visited = np.zeros(len(nodes), dtype=np.bool)
-    def dfs(node, previous_node):
-        global cycle
-        """
-        :param node: текущая вершина dfs
-        :param previous_node: предыдущая вершина dfs
-        :return: (dfs_state, node)
-            dfs_state:
-                0 --- цикл не найден
-                1 --- цикл найден, заполняем массив цикла
-                2 --- цикл найден, массив цикла заполнен 
-            node --- вершина на которой dfs нашёл цикл
-        """
-        if visited[node]:
-            # нашли цикл
-            cycle = [node]
-            return 1, node
-        visited[node] = True
-        for neighbour in adjacency_list[node]:
-            if neighbour != previous_node:
-                dfs_state, cycle_node = dfs(neighbour, node)
-                if dfs_state == 1:
-                    if node == cycle_node:
+
+class FeaturesGenerator:
+    def __init__(self, skeleton):
+        nodes, adjacency_list = convert_skeleton(skeleton)
+        self.nodes = np.array(nodes)
+        self.adjacency_list = adjacency_list
+
+    def generate_features(self):
+        self.find_cycles()
+        # self.find_straight_lines()
+        nodes_features = [self.generate_node_features(node_index, node_features0) for node_index, node_features0 in enumerate(self.nodes)]
+        nodes_features = np.array(nodes_features)
+        return nodes_features, self.adjacency_list
+
+    ################################################
+    # методы для всего графа
+
+    def find_cycles(self):
+        # поиск цикла (ищем только первый цикл, так как больше одного цикла почти не бывает (толко у цифры 8))
+        cycle = None
+        visited = np.zeros(len(self.nodes), dtype=np.bool)
+        def dfs(node, previous_node):
+            global cycle
+            """
+            :param node: текущая вершина dfs
+            :param previous_node: предыдущая вершина dfs
+            :return: (dfs_state, node)
+                dfs_state:
+                    0 --- цикл не найден
+                    1 --- цикл найден, заполняем массив цикла
+                    2 --- цикл найден, массив цикла заполнен 
+                node --- вершина на которой dfs нашёл цикл
+            """
+            if visited[node]:
+                # нашли цикл
+                cycle = [node]
+                return 1, node
+            visited[node] = True
+            for neighbour in self.adjacency_list[node]:
+                if neighbour != previous_node:
+                    dfs_state, cycle_node = dfs(neighbour, node)
+                    if dfs_state == 1:
+                        if node == cycle_node:
+                            return 2, None
+                        else:
+                            cycle.append(node)
+                            return 1, cycle_node
+                    elif dfs_state == 2:
                         return 2, None
-                    else:
-                        cycle.append(node)
-                        return 1, cycle_node
-                elif dfs_state == 2:
-                    return 2, None
-        return 0, None
-    dfs(0, -1)
+            return 0, None
+        dfs(0, -1)
+        self.cycle = cycle
 
-    # площадь цикла
-    if cycle is None:
-        cycle_area = 0
-    else:
-        x, y = nodes[0:2, cycle].T
-        # https://stackoverflow.com/a/30408825/5812238
-        cycle_area = 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+        # площадь цикла
+        if cycle is None:
+            self.cycle_area = 0
+        else:
+            x, y = self.nodes[0:2, cycle].T
+            # https://stackoverflow.com/a/30408825/5812238
+            self.cycle_area = 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
 
-    # поиск прямых линий
-    ...
+    ################################################
+    # методы для одной вершины
 
-    def generate_features(node, node_features0):
+    def generate_node_features(self, node, node_features0):
         x, y, degree, radial = node_features0
+        # TODO посмотреть как же так получается что степени вершин не совпадают
+        # assert degree == len(adjacency_list[node])
+        degree = len(self.adjacency_list[node])
+        assert 0 <= degree <= 4, 'неожиданная степень вершины: {}'.format(degree)
+
         node_features = []
         node_features += [degree]
         node_features += [radial]
+        node_features += [self.node_min_angle(node, x, y, degree, radial)]
+        node_features += self.node_cycles_features(node, x, y, degree, radial)
 
-        # TODO посмотреть как же так получается что степени вершин не совпадают
-        # assert degree == len(adjacency_list[node])
-        degree = len(adjacency_list[node])
-        assert 0 <= degree <= 4, 'неожиданная степень вершины: {}'.format(degree)
+        # расстояние/минимальное расстояние до вершины степени 1
+        # суммарный угол поворота на пути до ближайшей вершины степени 1
+        # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия --- путь в графе, такой что каждый угол примерно 180)
+        # наличие вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
+        # число связных компонент
+        return node_features
 
-        # min_angle
+    def node_min_angle(self, node, x, y, degree, radial):
         def get_vector_to_neighbour(neighbour):
-            x_neighbour, y_neighbour, _, _ = nodes[neighbour]
+            x_neighbour, y_neighbour, _, _ = self.nodes[neighbour]
             delta_x = x_neighbour - x
             delta_y = y_neighbour - y
             delta_length = math.sqrt(delta_x * delta_x + delta_y * delta_y)
             return (delta_x / delta_length, delta_y / delta_length)
-        vectors_to_neighbours = [get_vector_to_neighbour(neighbour) for neighbour in (adjacency_list[node])]
+        vectors_to_neighbours = [get_vector_to_neighbour(neighbour) for neighbour in (self.adjacency_list[node])]
         def angle_between_neighbours(neighbour1, neighbour2):
             x1, y1 = vectors_to_neighbours[neighbour1]
             x2, y2 = vectors_to_neighbours[neighbour2]
@@ -216,28 +241,17 @@ def generate_features(skeleton):
             min_angle = 0
         else:
             assert False
-        node_features += [min_angle]
+        return min_angle
 
+    def node_cycles_features(self, node, x, y, degree, radial):
         # number_cycles & cycle_area
-        if (cycle is not None) and (node in cycle):
+        if (self.cycle is not None) and (node in self.cycle):
             node_number_cycles = 1
-            node_cycle_area = cycle_area
+            node_cycle_area = self.cycle_area
         else:
             node_number_cycles = 0
             node_cycle_area = 0
-        node_features += [node_number_cycles]
-        node_features += [node_cycle_area]
-
-        # расстояние/минимальное расстояние до вершины степени 1
-        # суммарный угол поворота на пути до ближайшей вершины степени 1
-        # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия --- путь в графе, такой что каждый угол примерно 180)
-        # наличие вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
-        # число связных компонент
-        return node_features
-
-    nodes_features = [generate_features(node_index, node_features0) for node_index, node_features0 in enumerate(nodes)]
-    nodes_features = np.array(nodes_features)
-    return nodes_features, adjacency_list
+        return [node_number_cycles, node_cycle_area]
 
 
 skeletons = np.load('../2_skeleton_creator/skeletons.npy')
