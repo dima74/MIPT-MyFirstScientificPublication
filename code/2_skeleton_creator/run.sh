@@ -9,7 +9,8 @@ rm -rf directory_with_links_to_images
 mkdir directory_with_links_to_images
 
 cd directory_with_links_to_images
-ln -s ../../1_data_discrete/as_png/* .  # TODO extract path to directory with images to variable
+#ln -s ../../1_data_discrete/as_png/* .  # TODO extract path to directory with images to variable
+find ../../1_data_discrete/as_png -exec ln -s "{}" . \;
 cd ..
 
 ln -s ../directory_with_links_to_images code/

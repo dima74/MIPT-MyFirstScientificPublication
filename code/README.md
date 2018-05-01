@@ -25,7 +25,19 @@
 
         {
             'F': [{
-                'nodes_features': <number_vertexes, number_features>, 
+                'nodes_features': (number_vertexes, number_features), 
                 'adjacency_list': <array of arrays>,
+            }]
+        }
+
+## `/4_merge_data_and_features`
+* файл `data_and_features.pickle` — создаётся после запуска `merge_data_and_features.py`, содержит словарь
+
+        {
+            'y': (None, 1),
+            'I': (None, 64, 64),
+            'F': [{
+                'nodes_features': (number_vertexes, number_features), 
+                'adjacency_list': Бarray of arrays>,
             }]
         }

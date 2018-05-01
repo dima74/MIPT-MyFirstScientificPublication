@@ -40,11 +40,11 @@ def pps(skeleton):
     return result
 
 
-q = 0
+# q = 0
 def convert_skeleton(skeleton):
-    global q
-    print(q)
-    q += 1
+    # global q
+    # print(q)
+    # q += 1
     """
     :return: (nodes, edges)
         nodes: [(x, y, degree, radial)]
@@ -56,14 +56,15 @@ def convert_skeleton(skeleton):
     descriptions_to_nodes = {}
     def convert_node(node):
         """ получает вершину в виде (x, y, degree, radial), сохраняет её в список вершин и возвращает индекс этой ввершины """
-        # x, y, degree, radial = node
-        node = tuple(node)
-        if node in descriptions_to_nodes:
-            return descriptions_to_nodes[node]
+        x, y, degree, radial = node
+        # node_description = tuple(node)
+        node_description = (x, y)
+        if node_description in descriptions_to_nodes:
+            return descriptions_to_nodes[node_description]
         else:
             node_index = len(nodes)
             nodes.append(node)
-            descriptions_to_nodes[node] = node_index
+            descriptions_to_nodes[node_description] = node_index
             return node_index
 
     edges = []
@@ -77,18 +78,21 @@ def convert_skeleton(skeleton):
     for node0, node1 in edges:
         adjacency_list[node0].append(node1)
         adjacency_list[node1].append(node0)
+
+    # некоторая отладка для изучения того, почему записанноая степень вершины отличается от актуально
+    # можно удалить это
     for node_index, node in enumerate(nodes):
         if node[2] != len(adjacency_list[node_index]):
-            import sys
-            sys.path.insert(0, '/home/dima/6science/MyFirstScientificPublication/code/visualization')
-            import visualization.draw_skeleton
-            draw_skeleton(nodes, adjacency_list)
-        assert node[2] == len(adjacency_list[node_index])
-
-    # import sys
-    # sys.path.insert(0, '/home/dima/6science/MyFirstScientificPublication/code')
-    # from visualization.visualization import draw_skeleton
-    # draw_skeleton(nodes, adjacency_list)
+            # print()
+            # print(node_index, node, adjacency_list[node_index])
+            # for node_neighbour in adjacency_list[node_index]:
+            #     print(node_neighbour, nodes[node_neighbour])
+            # вернуть идентификацию вершин только по координатам
+            # import sys
+            # sys.path.insert(0, '/home/dima/6science/MyFirstScientificPublication/code')
+            from visualization.visualization import draw_skeleton
+            # draw_skeleton(nodes, adjacency_list)
+        # assert node[2] == len(adjacency_list[node_index])
 
     return nodes, adjacency_list
 
@@ -108,6 +112,9 @@ def convert_skeleton(skeleton):
 # 04689abdgopqBDOPQR
 # большая:    0oDOQ
 # маленькая:  4689abdgpqBPR
+
+
+
 
 def generate_features(skeleton):
     """
@@ -180,7 +187,7 @@ def generate_features(skeleton):
         # TODO посмотреть как же так получается что степени вершин не совпадают
         # assert degree == len(adjacency_list[node])
         degree = len(adjacency_list[node])
-        assert 1 <= degree <= 3
+        assert 0 <= degree <= 4, 'неожиданная степень вершины: {}'.format(degree)
 
         # min_angle
         def get_vector_to_neighbour(neighbour):
@@ -194,13 +201,19 @@ def generate_features(skeleton):
             x1, y1 = vectors_to_neighbours[neighbour1]
             x2, y2 = vectors_to_neighbours[neighbour2]
             dot_product = x1 * x2 + y1 * y2
-            return abs(math.acos(dot_product))
+            # https://stackoverflow.com/a/13849249/5812238
+            return abs(math.acos(np.clip(dot_product, -1, +1)))
         if degree == 1:
             min_angle = 0
         elif degree == 2:
             min_angle = angle_between_neighbours(0, 1)
         elif degree == 3:
             min_angle = min(angle_between_neighbours(0, 1), angle_between_neighbours(1, 2), angle_between_neighbours(2, 0))
+        elif degree == 4:
+            # изображений с вершинами степени 4 не так много...
+            min_angle = math.pi / 4
+        elif degree == 0:
+            min_angle = 0
         else:
             assert False
         node_features += [min_angle]
@@ -219,14 +232,16 @@ def generate_features(skeleton):
         # суммарный угол поворота на пути до ближайшей вершины степени 1
         # длина максимальной прямой линии, в которой содержится текущая вершина (прямая линия --- путь в графе, такой что каждый угол примерно 180)
         # наличие вершин степени 4 (полезно, применимо к только 2(?) символам, неосуществимо при текущем алгоритме ([хотя мб считать две очень близких вершины степени 3 как вершину степени 4))
+        # число связных компонент
         return node_features
 
     nodes_features = [generate_features(node_index, node_features0) for node_index, node_features0 in enumerate(nodes)]
+    nodes_features = np.array(nodes_features)
     return nodes_features, adjacency_list
 
 
 skeletons = np.load('../2_skeleton_creator/skeletons.npy')
-features = list(map(generate_features, skeletons))
+features = list(map(generate_features, tqdm(skeletons)))
 result = {
     'F': [
         {
@@ -235,7 +250,9 @@ result = {
         } for nodes_features, adjacency_list in features
     ]
 }
-pickle.dump('features.pickle', features)
+
+with open('features.pickle', 'wb') as output:
+    pickle.dump(result, output)
 
 # with open('single-image.pickle', 'rb') as input:
 #     data = pickle.load(input)

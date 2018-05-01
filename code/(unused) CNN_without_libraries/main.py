@@ -169,6 +169,7 @@ class FCLayer:
             gradients_for_input = gradients_for_input.reshape((height, width, depth))
             gradients_for_inputs.append(gradients_for_input)
 
+            # TODO проверить почему gradients_for_weightsне зависит от input
             # gradients_for_weights[c1][i] = sum_c2(d(L)/d(c2) * d(c2)/d(weight[c1][i])) = d(L)/d(c1) * d(c1)/d(weight[c1][i])
             # c2 = sum_i(weight[c2][i] * input[i]) + b[c2]
             gradients_for_weights += weights * gradients_for_output.reshape((-1, 1))

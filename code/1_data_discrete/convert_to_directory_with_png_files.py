@@ -1,7 +1,14 @@
+from constants import N
 from generated.data_loader import load_data_discrete
-X, y = load_data_discrete(path='generated', size=1000)
+X, y = load_data_discrete(path='generated', size=N)
 
+import shutil
 import os
+try:
+    os.remove('data.pickle')
+except OSError:
+    pass
+shutil.rmtree('as_png', ignore_errors=True)
 os.mkdir('as_png')
 
 import matplotlib
