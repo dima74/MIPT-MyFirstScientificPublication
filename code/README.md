@@ -21,7 +21,8 @@
 * файл `skeletons.npy` — создаётся после запуска `run.sh`, содержит массив скелетов (каждый скелет --- массив вещественных чисел)
 
 ## `/3_features_generator`
-* файл `features.pickle` — создаётся после запуска `features_generator.py`, содержит словарь
+После запуска `features_generator.py` создаются
+* файл `features.pickle` — содержит словарь
 
         {
             'F': [{
@@ -29,6 +30,8 @@
                 'adjacency_list': <array of arrays>,
             }]
         }
+
+* файл `data_for_visualization.pickle` — содержит информацию о циклах и прямых линиях для графов
 
 ## `/4_merge_data_and_features`
 * файл `data_and_features.pickle` — создаётся после запуска `merge_data_and_features.py`, содержит словарь

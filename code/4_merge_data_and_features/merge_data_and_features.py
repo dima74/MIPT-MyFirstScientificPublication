@@ -5,6 +5,7 @@ result = {}
 with open('../3_features_generator/features.pickle', 'rb') as input:
     features = pickle.load(input)
     result['F'] = features['F']
+    result['F_nodes_features_description'] = features['F_nodes_features_description']
 
 with open('../1_data_discrete/data.pickle', 'rb') as input:
     data = pickle.load(input)

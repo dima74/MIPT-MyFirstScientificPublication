@@ -1,15 +1,12 @@
-from helpers import graphs
+from helpers import *
 numbers_vertexes = []
 for graph in graphs():
     adjacency_list = graph['adjacency_list']
     numbers_vertexes.append(len(adjacency_list))
 
-import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-
-plt.figure(figsize=(10, 7))
-plt.hist(numbers_vertexes, bins=20)
-plt.title('Гистограмма числа вершин графа медиального представления')
+plt.figure()
+plt.hist(numbers_vertexes, bins=50)
+# plt.title('Гистограмма числа вершин графа медиального графа')
 plt.xlabel('число вершин')
-plt.show()
+plt.savefig('images/histogram_number_vertexes.eps')
