@@ -232,6 +232,12 @@ class FeaturesGenerator:
             update_angle(node)
         self.angles_sum_on_path_one_degree_node = angles_sum_on_path_one_degree_node
 
+        # TODO решить что делать если нет вершин степени один (заменять на нули имхо плохое решение)
+        # for array in distances, angles_sum_on_path_one_degree_node:
+        #     for i in range(len(array)):
+        #         if array[i] is None:
+        #             array[i] = 0
+
     def find_straight_lines(self):
         # прямая линия — путь в графе, такой что угол между каждой парой соседних рёбер отличается не более чем на 10° от 180°
 
